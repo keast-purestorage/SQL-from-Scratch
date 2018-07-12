@@ -1,0 +1,59 @@
+/* temporary months table to indicate 1st and last days*/
+WITH months AS (
+  SELECT 
+    '2017-01-01' AS first_day, 
+    '2017-01-31' AS last_day 
+  UNION 
+  SELECT 
+    '2017-02-01' AS first_day, 
+    '2017-02-28' AS last_day 
+  UNION 
+  SELECT 
+    '2017-03-01' AS first_day, 
+    '2017-03-31' AS last_day
+), 
+
+/*cross join table of the months and subscription table*/
+cross_join AS (
+  SELECT *
+  FROM subscriptions
+  CROSS JOIN months
+), 
+
+/* query to determine status of active or canceled by month and segment */
+status AS (
+  SELECT 
+    id, 
+    first_day AS month, 
+    CASE
+      WHEN (subscription_start < first_day) 
+        AND (
+          subscription_end > first_day 
+          OR subscription_end IS NULL
+        		) 
+  	    THEN 1
+        ELSE 0
+    END AS is_active, 
+    CASE
+      WHEN (subscription_end BETWEEN first_day AND last_day) 
+  	THEN 1
+      ELSE 0
+    END AS is_canceled 
+   FROM cross_join
+), 
+
+/* query to aggregate the active and canceled status' by segment */
+status_aggregate AS (
+  SELECT 
+    month, 
+    SUM(is_active) AS active,
+    SUM(is_canceled) AS canceled
+  FROM status 
+  GROUP BY month
+) 
+
+/* query to calculate the churn rate*/
+SELECT
+  month, 
+  round(1.0 * canceled / active,2) AS churn_rate_overall  
+FROM status_aggregate;
